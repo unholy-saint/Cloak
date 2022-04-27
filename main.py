@@ -1,65 +1,53 @@
 import cv2
 import numpy as np
-import time
-# 4 cc i.e a 4 byte code used for video codec; for windows is XVID; IOS = AVC1
 
-FourCC = cv2.VideoWriter_fourcc(*'XVID')
+size = (640, 480)
 
-file = cv2.VideoWriter('file.avi', FourCC, 30, (640, 480))
+Fourcc = cv2.VideoWriter_fourcc(*'XVID')
+outputFile = cv2.VideoWriter('file.avi', Fourcc, 30, size)
 
-# starting the camera
 camera = cv2.VideoCapture(0)
-time.sleep(3)
 
-# for bg images
-for i in range(60):
-    label, img_data = camera.read()
-
-img_data = np.flip(img_data, axis=1)
+bg = cv2.imread('assets/BG.jpg')
+bg = cv2.resize(bg, size)
 
 while camera.isOpened():
-    label, img = camera.read()
+    label , img = camera.read()
 
     if not label:
         break
 
     img = np.flip(img, axis=1)
-
-    # converting the color from rgb ( bgr ) to hsl ( hsv )
+    img = cv2.resize(img, size)
+    
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    lower_range = np.array([0, 120, 50])
-    upper_range = np.array([10, 255, 255])
+    lowerMaskRange = np.array([0,0,0])
+    upperMaskRange = np.array([130, 14, 30])
 
-    lower_mask = cv2.inRange(hsv, lower_range, upper_range)
+    lowerMask = cv2.inRange(img, lowerMaskRange, upperMaskRange)
 
-    lower_range = np.array([170, 120, 50])
-    upper_range = np.array([255, 255, 255])
+    # lowerMaskRange = np.array([30,30, 30])
+    # upperMaskRange = np.array([104, 153, 70])
 
-    upper_mask = cv2.inRange(hsv, lower_range, upper_range)
+    # upperMask = cv2.inRange(img, lowerMaskRange, upperMaskRange)
 
-    lower_mask = lower_mask + upper_mask
+    # frame = upperMask + lowerMask
 
-    # open and expand ( dilation operation) for combined mask with lower shade and upper shade
-    lower_mask = cv2.morphologyEx(
-        lower_mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-    lower_mask = cv2.morphologyEx(
-        lower_mask, cv2.MORPH_DILATE, np.ones((3, 3), np.uint8))
+    Morph = cv2.morphologyEx(lowerMask, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    Morph = cv2.morphologyEx(Morph, cv2.MORPH_DILATE, np.ones((2,2), np.uint8))
 
-    # selecting the maskless parts of lower_mask and saving in upper_mask
+    nonMask = cv2.bitwise_not(Morph)
 
-    upper_mask = cv2.bitwise_not(lower_mask)
+    filteredImage = cv2.bitwise_and(img, img, mask=nonMask)
+    filteredBG = cv2.bitwise_and(bg, bg, mask=Morph)
 
-    # keeping the part of img without red color
-    filtered_img = cv2.bitwise_and(img, img, mask=upper_mask)
-    filtered_bg = cv2.bitwise_and(img_data, img_data, mask=lower_mask)
+    output = cv2.addWeighted(filteredImage, 1, filteredBG, 1, 0)
+    
+    outputFile.write(output)
 
-    output = cv2.addWeighted(filtered_img, 1, filtered_bg, 1, 0)
-
-    file.write(output)
-
-    cv2.imshow('Haarrryyyy', output)
-    cv2.waitKey(2)
+    cv2.imshow('Bangkok', output)
+    cv2.waitKey(3)
 
 camera.release()
 cv2.destroyAllWindows()
